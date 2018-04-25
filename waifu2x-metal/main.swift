@@ -29,7 +29,7 @@ extension MTLComputeCommandEncoder {
 
 
 let device = MTLCreateSystemDefaultDevice()!
-let library = device.newDefaultLibrary()!
+let library = device.makeDefaultLibrary()!
 let queue = device.makeCommandQueue()
 
 let waifu2xPipelineState = try! device.makeComputePipelineState(function: library.makeFunction(name: "waifu2x")!)
@@ -41,7 +41,7 @@ func saveImage(_ image: CGImage, path: String) {
     let rep = NSBitmapImageRep(cgImage: image)
     rep.size = CGSize(width: image.width, height: image.height)
 
-    guard let data = rep.representation(using: .PNG, properties: [:]) else {
+    guard let data = rep.representation(using: .png, properties: [:]) else {
         fatalError()
     }
     try? data.write(to: URL(fileURLWithPath: path), options: [.atomic])
@@ -101,29 +101,29 @@ func createEmptyTexture(_ device: MTLDevice, width: Int, height: Int, format: MT
         desc.arrayLength = length
     }
 
-    return device.makeTexture(descriptor: desc)
+    return device.makeTexture(descriptor: desc)!
 }
 
 func createEncoder(_ commandBuffer: MTLCommandBuffer, pipelineState: MTLComputePipelineState) -> MTLComputeCommandEncoder {
     let encoder = commandBuffer.makeComputeCommandEncoder()
-    encoder.setComputePipelineState(pipelineState)
-    return encoder
+    encoder?.setComputePipelineState(pipelineState)
+    return encoder!
 }
 
 
 func createMetalFunc(_ pipelineState: MTLComputePipelineState, inTexture: MTLTexture, outTexture: MTLTexture) -> MTLTexture {
-    let commandBuf = queue.makeCommandBuffer()
+    let commandBuf = queue?.makeCommandBuffer()
     do {
-        let encoder = createEncoder(commandBuf, pipelineState: pipelineState)
-        encoder.setTexture(inTexture, at: 0)
-        encoder.setTexture(outTexture, at: 1)
+        let encoder = createEncoder(commandBuf!, pipelineState: pipelineState)
+        encoder.setTexture(inTexture, index: 0)
+        encoder.setTexture(outTexture, index: 1)
         encoder.setThread(inTexture)
         encoder.endEncoding()
     }
-    commandBuf.commit()
-    commandBuf.waitUntilCompleted()
+    commandBuf?.commit()
+    commandBuf?.waitUntilCompleted()
 
-    if let err = commandBuf.error {
+    if let err = commandBuf?.error {
         fatalError("MetalExecutionError: \(err)")
     }
 
@@ -141,16 +141,16 @@ func combineRGBChannels(_ inTexture: MTLTexture) -> MTLTexture {
 }
 
 func sync(_ texture: MTLTexture) -> MTLTexture {
-    let commandBuf = queue.makeCommandBuffer()
+    let commandBuf = queue?.makeCommandBuffer()
     do {
-        let encoder = commandBuf.makeBlitCommandEncoder()
-        encoder.synchronize(resource: texture)
-        encoder.endEncoding()
+        let encoder = commandBuf?.makeBlitCommandEncoder()
+        encoder?.synchronize(resource: texture)
+        encoder?.endEncoding()
     }
-    commandBuf.commit()
-    commandBuf.waitUntilCompleted()
+    commandBuf?.commit()
+    commandBuf?.waitUntilCompleted()
 
-    if let err = commandBuf.error {
+    if let err = commandBuf?.error {
         fatalError("MetalExecutionError: \(err)")
     }
     return texture
@@ -161,32 +161,32 @@ func waifu2x(_ inTextures: MTLTexture, weight: ContiguousArray<float3x3>, bias: 
     precondition(inCount == inTextures.arrayLength)
 
     let outTexture = createEmptyTexture(device, width: inTextures.width, height: inTextures.height, format: .r32Float)
-    let commandBuf = queue.makeCommandBuffer()
+    let commandBuf = queue?.makeCommandBuffer()
 
     do {
-        let encoder = createEncoder(commandBuf, pipelineState: waifu2xPipelineState)
-        encoder.setTexture(inTextures, at: 0)
-        encoder.setTexture(outTexture, at: 1)
+        let encoder = createEncoder(commandBuf!, pipelineState: waifu2xPipelineState)
+        encoder.setTexture(inTextures, index: 0)
+        encoder.setTexture(outTexture, index: 1)
 
         let weightBuffer = device.makeBuffer(length: MemoryLayout<float3x3>.size * inCount, options: [])
 
-        let ws = weightBuffer.contents().assumingMemoryBound(to: float3x3.self)
-        for i in 0..<inCount { ws[i] = weight[i] }
-        encoder.setBuffer(weightBuffer, offset: 0, at: 0)
+        let ws = weightBuffer?.contents().assumingMemoryBound(to: float3x3.self)
+        for i in 0..<inCount { ws![i] = weight[i] }
+        encoder.setBuffer(weightBuffer, offset: 0, index: 0)
 
         let biasBuffer = device.makeBuffer(length: MemoryLayout<Float32>.size, options: [])
 
-        let b = biasBuffer.contents().assumingMemoryBound(to: Float32.self)
-        b[0] = Float32(bias)
-        encoder.setBuffer(biasBuffer, offset: 0, at: 1)
+        let b = biasBuffer?.contents().assumingMemoryBound(to: Float32.self)
+        b![0] = Float32(bias)
+        encoder.setBuffer(biasBuffer, offset: 0, index: 1)
 
         encoder.setThread(inTextures)
         encoder.endEncoding()
     }
-    commandBuf.commit()
-    commandBuf.waitUntilCompleted()
+    commandBuf?.commit()
+    commandBuf?.waitUntilCompleted()
 
-    if let err = commandBuf.error {
+    if let err = commandBuf?.error {
         fatalError("MetalExecutionError: \(err)")
     }
     
@@ -248,16 +248,16 @@ func newArray(_ e: MTLTexture, size: Int = 1) -> MTLTexture {
 }
 
 func copy(_ src: [MTLTexture], dest: MTLTexture) {
-    let commandBuf = queue.makeCommandBuffer()
-    let encoder = commandBuf.makeBlitCommandEncoder()
+    let commandBuf = queue?.makeCommandBuffer()
+    let encoder = commandBuf?.makeBlitCommandEncoder()
     for i in 0..<src.count {
-        encoder.copy(from: src[i], sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(), sourceSize: MTLSizeMake(dest.width, dest.height, 1), to: dest, destinationSlice: i, destinationLevel: 0, destinationOrigin: MTLOrigin())
+        encoder?.copy(from: src[i], sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(), sourceSize: MTLSizeMake(dest.width, dest.height, 1), to: dest, destinationSlice: i, destinationLevel: 0, destinationOrigin: MTLOrigin())
     }
-    encoder.endEncoding()
-    commandBuf.commit()
-    commandBuf.waitUntilCompleted()
+    encoder?.endEncoding()
+    commandBuf?.commit()
+    commandBuf?.waitUntilCompleted()
 
-    if let err = commandBuf.error {
+    if let err = commandBuf?.error {
         fatalError("MetalExecutionError: \(err)")
     }
 }

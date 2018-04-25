@@ -10,3 +10,5 @@ cd build/Release
 cp ../../model/scale2.0x_model.json .
 ./waifu2x-metal Sample.jpg
 ```
+
+This repo forked from the original in an attempt to bring it up to date with Swift 4 and Metal 2 (probably won't be accomplished, but still worth a shot)
